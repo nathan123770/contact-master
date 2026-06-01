@@ -219,9 +219,15 @@ async function submit() {
 .avatar-preview {
   width: 86px;
   height: 86px;
-  border-radius: 30px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  padding: 0;
   font-size: 30px;
   cursor: pointer;
+}
+
+.avatar-preview img {
+  border-radius: 50%;
 }
 
 .avatar-uploader p {

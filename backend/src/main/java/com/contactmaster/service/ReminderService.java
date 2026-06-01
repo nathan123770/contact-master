@@ -12,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -36,17 +35,21 @@ public class ReminderService {
                                          int page,
                                          int size) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.min(Math.max(size, 1), 100));
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
         Page<ContactReminder> reminders = reminderRepository.search(
                 userId,
                 normalizeStatus(status),
                 type,
                 normalize(keyword),
                 contactId,
-                LocalDate.now(),
+                now,
+                todayStart,
+                todayStart.plusDays(1),
                 pageable
         );
         Map<Long, ContactSummary> contacts = contactSummaries(reminders.getContent());
-        return reminders.map(reminder -> ReminderResponse.from(reminder, contacts.get(reminder.getContactId()), LocalDate.now()));
+        return reminders.map(reminder -> ReminderResponse.from(reminder, contacts.get(reminder.getContactId()), LocalDateTime.now()));
     }
 
     @Transactional
@@ -56,7 +59,7 @@ public class ReminderService {
         reminder.setUserId(userId);
         fill(reminder, request);
         ContactReminder saved = reminderRepository.save(reminder);
-        return ReminderResponse.from(saved, ContactSummary.from(contact), LocalDate.now());
+        return ReminderResponse.from(saved, ContactSummary.from(contact), LocalDateTime.now());
     }
 
     @Transactional
@@ -64,7 +67,7 @@ public class ReminderService {
         ContactReminder reminder = findOwned(userId, id);
         Contact contact = findActiveContact(userId, request.contactId());
         fill(reminder, request);
-        return ReminderResponse.from(reminder, ContactSummary.from(contact), LocalDate.now());
+        return ReminderResponse.from(reminder, ContactSummary.from(contact), LocalDateTime.now());
     }
 
     @Transactional
@@ -73,7 +76,7 @@ public class ReminderService {
         reminder.setCompleted(request.completed());
         reminder.setCompletedAt(request.completed() ? LocalDateTime.now() : null);
         ContactSummary contact = contactSummaries(List.of(reminder)).get(reminder.getContactId());
-        return ReminderResponse.from(reminder, contact, LocalDate.now());
+        return ReminderResponse.from(reminder, contact, LocalDateTime.now());
     }
 
     @Transactional
@@ -87,31 +90,33 @@ public class ReminderService {
     }
 
     public List<ReminderResponse> dashboard(Long userId) {
-        LocalDate today = LocalDate.now();
-        List<ContactReminder> reminders = dashboardReminderRows(userId, today);
+        LocalDateTime now = LocalDateTime.now();
+        List<ContactReminder> reminders = dashboardReminderRows(userId, now);
         Map<Long, ContactSummary> contacts = activeContactSummaries(reminders);
         return reminders.stream()
                 .filter(reminder -> contacts.containsKey(reminder.getContactId()))
-                .map(reminder -> ReminderResponse.from(reminder, contacts.get(reminder.getContactId()), today))
+                .map(reminder -> ReminderResponse.from(reminder, contacts.get(reminder.getContactId()), now))
                 .limit(6)
                 .toList();
     }
 
     public DashboardReminderSummary dashboardSummary(Long userId) {
-        LocalDate today = LocalDate.now();
-        List<ContactReminder> reminders = dashboardReminderRows(userId, today);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime tomorrowStart = todayStart.plusDays(1);
+        List<ContactReminder> reminders = dashboardReminderRows(userId, now);
         Map<Long, ContactSummary> contacts = activeContactSummaries(reminders);
         long overdue = reminders.stream()
                 .filter(reminder -> contacts.containsKey(reminder.getContactId()))
-                .filter(reminder -> reminder.getRemindDate().isBefore(today))
+                .filter(reminder -> reminder.getRemindAt().isBefore(now))
                 .count();
         long todayCount = reminders.stream()
                 .filter(reminder -> contacts.containsKey(reminder.getContactId()))
-                .filter(reminder -> reminder.getRemindDate().isEqual(today))
+                .filter(reminder -> !reminder.getRemindAt().isBefore(now) && reminder.getRemindAt().isBefore(tomorrowStart))
                 .count();
         long upcoming = reminders.stream()
                 .filter(reminder -> contacts.containsKey(reminder.getContactId()))
-                .filter(reminder -> reminder.getRemindDate().isAfter(today))
+                .filter(reminder -> !reminder.getRemindAt().isBefore(tomorrowStart))
                 .count();
         return new DashboardReminderSummary(
                 overdue,
@@ -120,10 +125,10 @@ public class ReminderService {
         );
     }
 
-    private List<ContactReminder> dashboardReminderRows(Long userId, LocalDate today) {
-        return reminderRepository.findByUserIdAndCompletedFalseAndRemindDateLessThanEqualOrderByRemindDateAscUpdatedAtDesc(
+    private List<ContactReminder> dashboardReminderRows(Long userId, LocalDateTime now) {
+        return reminderRepository.findByUserIdAndCompletedFalseAndRemindAtLessThanEqualOrderByRemindAtAscUpdatedAtDesc(
                 userId,
-                today.plusDays(7)
+                now.plusDays(7)
         );
     }
 
@@ -144,7 +149,7 @@ public class ReminderService {
     private void fill(ContactReminder reminder, ReminderRequest request) {
         reminder.setContactId(request.contactId());
         reminder.setType(request.type());
-        reminder.setRemindDate(request.remindDate());
+        reminder.setRemindAt(request.remindAt());
         reminder.setNote(normalize(request.note()));
     }
 

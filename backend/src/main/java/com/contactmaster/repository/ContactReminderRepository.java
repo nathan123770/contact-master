@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,8 +28,8 @@ public interface ContactReminderRepository extends JpaRepository<ContactReminder
                 :status is null or :status = '' or
                 (:status = 'pending' and r.completed = false) or
                 (:status = 'completed' and r.completed = true) or
-                (:status = 'overdue' and r.completed = false and r.remindDate < :today) or
-                (:status = 'today' and r.completed = false and r.remindDate = :today)
+                (:status = 'overdue' and r.completed = false and r.remindAt < :now) or
+                (:status = 'today' and r.completed = false and r.remindAt >= :todayStart and r.remindAt < :tomorrowStart)
               )
               and (
                 :keyword is null or :keyword = '' or
@@ -38,9 +38,9 @@ public interface ContactReminderRepository extends JpaRepository<ContactReminder
                 lower(coalesce(r.note, '')) like lower(concat('%', :keyword, '%'))
               )
             order by
-              case when r.completed = false and r.remindDate < :today then 0 else 1 end,
+              case when r.completed = false and r.remindAt < :now then 0 else 1 end,
               r.completed asc,
-              r.remindDate asc,
+              r.remindAt asc,
               r.updatedAt desc
             """)
     Page<ContactReminder> search(@Param("userId") Long userId,
@@ -48,10 +48,12 @@ public interface ContactReminderRepository extends JpaRepository<ContactReminder
                                  @Param("type") ReminderType type,
                                  @Param("keyword") String keyword,
                                  @Param("contactId") Long contactId,
-                                 @Param("today") LocalDate today,
+                                 @Param("now") LocalDateTime now,
+                                 @Param("todayStart") LocalDateTime todayStart,
+                                 @Param("tomorrowStart") LocalDateTime tomorrowStart,
                                  Pageable pageable);
 
-    List<ContactReminder> findByUserIdAndCompletedFalseAndRemindDateLessThanEqualOrderByRemindDateAscUpdatedAtDesc(Long userId, LocalDate endDate);
+    List<ContactReminder> findByUserIdAndCompletedFalseAndRemindAtLessThanEqualOrderByRemindAtAscUpdatedAtDesc(Long userId, LocalDateTime endDate);
 
     @Modifying
     void deleteByUserIdAndContactId(Long userId, Long contactId);

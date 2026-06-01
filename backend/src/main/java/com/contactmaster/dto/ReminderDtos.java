@@ -17,7 +17,8 @@ public class ReminderDtos {
     public record ReminderRequest(
             @NotNull Long contactId,
             @NotNull ReminderType type,
-            @NotNull LocalDate remindDate,
+            LocalDate remindDate,
+            @NotNull LocalDateTime remindAt,
             String note
     ) {
     }
@@ -32,6 +33,7 @@ public class ReminderDtos {
             String contactPhone,
             ReminderType type,
             LocalDate remindDate,
+            LocalDateTime remindAt,
             String note,
             boolean completed,
             LocalDateTime completedAt,
@@ -39,8 +41,8 @@ public class ReminderDtos {
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {
-        public static ReminderResponse from(ContactReminder reminder, ContactSummary contact, LocalDate today) {
-            boolean overdue = !reminder.isCompleted() && reminder.getRemindDate().isBefore(today);
+        public static ReminderResponse from(ContactReminder reminder, ContactSummary contact, LocalDateTime now) {
+            boolean overdue = !reminder.isCompleted() && reminder.getRemindAt().isBefore(now);
             return new ReminderResponse(
                     reminder.getId(),
                     reminder.getContactId(),
@@ -48,6 +50,7 @@ public class ReminderDtos {
                     contact == null ? null : contact.phone(),
                     reminder.getType(),
                     reminder.getRemindDate(),
+                    reminder.getRemindAt(),
                     reminder.getNote(),
                     reminder.isCompleted(),
                     reminder.getCompletedAt(),

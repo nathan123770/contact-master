@@ -47,7 +47,12 @@
 
       <main class="content">
         <DashboardView v-if="active === 'dashboard'" @openContacts="active = 'contacts'" @openReminders="active = 'reminders'" />
-        <ContactsView v-else-if="active === 'contacts'" @openReminders="active = 'reminders'" />
+        <ContactsView
+          v-else-if="active === 'contacts' || active === 'favorites'"
+          :key="active"
+          :initial-tab="active === 'favorites' ? 'favorites' : 'groups'"
+          @openReminders="active = 'reminders'"
+        />
         <RemindersView v-else-if="active === 'reminders'" />
         <RecycleBinView v-else />
       </main>
@@ -84,8 +89,8 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { ArrowDown, Bell, DataLine, Delete, UserFilled } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ArrowDown, Bell, DataLine, Delete, Star, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from './api'
 import AuthView from './views/AuthView.vue'
@@ -99,10 +104,12 @@ const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 const active = ref('dashboard')
 const passwordVisible = ref(false)
 const passwordForm = ref({ oldPassword: '', newPassword: '' })
+let reminderTimer = null
 
 const navItems = [
   { key: 'dashboard', label: '概览', icon: DataLine },
   { key: 'contacts', label: '通讯录', icon: UserFilled },
+  { key: 'favorites', label: '收藏', icon: Star },
   { key: 'reminders', label: '提醒', icon: Bell },
   { key: 'recycle', label: '回收站', icon: Delete }
 ]
@@ -116,7 +123,12 @@ const pageInfo = {
   contacts: {
     title: '通讯录',
     eyebrow: 'iOS 26 Contacts',
-    description: '按分组、收藏和未分组快速浏览，支持导入导出与批量管理。'
+    description: '按分组和未分组快速浏览，支持导入导出与批量管理。'
+  },
+  favorites: {
+    title: '收藏联系人',
+    eyebrow: 'Favorite Contacts',
+    description: '集中查看重点联系人，快速取消收藏或进入详情。'
   },
   reminders: {
     title: '提醒中心',
@@ -135,6 +147,7 @@ const pageMeta = computed(() => pageInfo[active.value])
 function handleAuthed(payload) {
   token.value = payload.token
   user.value = payload
+  startReminderPolling()
 }
 
 function logout() {
@@ -142,6 +155,7 @@ function logout() {
   localStorage.removeItem('user')
   token.value = null
   user.value = null
+  stopReminderPolling()
 }
 
 async function changePassword() {
@@ -149,6 +163,46 @@ async function changePassword() {
   ElMessage.success('密码修改成功')
   passwordVisible.value = false
   passwordForm.value = { oldPassword: '', newPassword: '' }
+}
+
+onMounted(() => {
+  if (token.value) startReminderPolling()
+})
+
+onBeforeUnmount(stopReminderPolling)
+
+function startReminderPolling() {
+  stopReminderPolling()
+  checkDueReminders()
+  reminderTimer = window.setInterval(checkDueReminders, 60000)
+}
+
+function stopReminderPolling() {
+  if (reminderTimer) {
+    window.clearInterval(reminderTimer)
+    reminderTimer = null
+  }
+}
+
+async function checkDueReminders() {
+  if (!token.value || typeof window === 'undefined' || !('Notification' in window)) return
+  const data = await api.get('/dashboard/reminders').then((response) => response.data?.data).catch(() => null)
+  if (!data?.items?.length) return
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission().catch(() => null)
+  }
+  if (Notification.permission !== 'granted') return
+  const notified = new Set(JSON.parse(sessionStorage.getItem('notifiedReminders') || '[]'))
+  const now = Date.now()
+  for (const reminder of data.items) {
+    if (!reminder.remindAt || reminder.completed || new Date(reminder.remindAt).getTime() > now || notified.has(reminder.id)) continue
+    new Notification('联系人提醒', {
+      body: `${reminder.contactName || '未知联系人'}：${reminder.note || '请处理这条提醒'}`,
+      tag: `contact-reminder-${reminder.id}`
+    })
+    notified.add(reminder.id)
+  }
+  sessionStorage.setItem('notifiedReminders', JSON.stringify([...notified].slice(-100)))
 }
 </script>
 
@@ -383,7 +437,7 @@ async function changePassword() {
     left: 12px;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
     padding: 8px;
     border-color: rgb(255 255 255 / 58%);

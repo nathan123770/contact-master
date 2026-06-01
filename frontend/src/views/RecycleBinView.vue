@@ -1,14 +1,7 @@
 <template>
   <div class="recycle-page">
-    <div class="toolbar">
-      <div>
-        <h2 class="page-title">回收站</h2>
-        <span class="muted">这里展示软删除的联系人，可恢复或彻底删除。</span>
-      </div>
-    </div>
-
     <section class="panel">
-      <el-table class="desktop-table" :data="contacts">
+      <el-table class="desktop-table" :data="contacts" empty-text="暂无数据">
         <el-table-column prop="name" label="姓名" min-width="140" />
         <el-table-column prop="phone" label="手机号" min-width="130" />
         <el-table-column prop="groupName" label="分组" width="120" />

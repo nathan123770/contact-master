@@ -87,7 +87,7 @@ public class ContactController extends BaseController {
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportCsv(HttpServletRequest request, @RequestParam(required = false) String keyword) {
-        byte[] body = contactService.exportCsv(currentUserId(request), keyword).getBytes(StandardCharsets.UTF_8);
+        byte[] body = ("\uFEFF" + contactService.exportCsv(currentUserId(request), keyword)).getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=contacts.csv")
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))

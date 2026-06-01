@@ -26,6 +26,9 @@ public class ContactReminder {
     @Column(nullable = false)
     private LocalDate remindDate;
 
+    @Column(nullable = false)
+    private LocalDateTime remindAt;
+
     @Column(length = 500)
     private String note;
 
@@ -79,6 +82,15 @@ public class ContactReminder {
 
     public void setRemindDate(LocalDate remindDate) {
         this.remindDate = remindDate;
+    }
+
+    public LocalDateTime getRemindAt() {
+        return remindAt;
+    }
+
+    public void setRemindAt(LocalDateTime remindAt) {
+        this.remindAt = remindAt;
+        this.remindDate = remindAt == null ? null : remindAt.toLocalDate();
     }
 
     public String getNote() {

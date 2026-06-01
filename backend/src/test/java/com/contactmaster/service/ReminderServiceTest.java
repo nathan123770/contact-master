@@ -12,7 +12,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +28,7 @@ class ReminderServiceTest {
 
     @Test
     void createRejectsContactsOwnedByAnotherUser() {
-        ReminderRequest request = new ReminderRequest(8L, ReminderType.FOLLOW_UP, LocalDate.now().plusDays(1), "Call back");
+        ReminderRequest request = new ReminderRequest(8L, ReminderType.FOLLOW_UP, null, LocalDateTime.now().plusDays(1), "Call back");
         when(contactRepository.findByIdAndUserId(8L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(1L, request))
@@ -40,8 +40,8 @@ class ReminderServiceTest {
 
     @Test
     void searchReturnsOnlyCurrentUsersActiveContactReminders() {
-        ContactReminder reminder = reminder(1L, 2L, 3L, ReminderType.FOLLOW_UP, LocalDate.now().plusDays(1), false);
-        when(reminderRepository.search(eq(1L), eq("pending"), isNull(), eq("zhang"), isNull(), any(), any()))
+        ContactReminder reminder = reminder(1L, 2L, 3L, ReminderType.FOLLOW_UP, LocalDateTime.now().plusDays(1), false);
+        when(reminderRepository.search(eq(1L), eq("pending"), isNull(), eq("zhang"), isNull(), any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(reminder), PageRequest.of(0, 10), 1));
         when(contactRepository.findAllById(List.of(3L))).thenReturn(List.of(contact(3L, 1L, "Zhang San", "13800138000", false)));
 
@@ -49,12 +49,12 @@ class ReminderServiceTest {
 
         assertThat(page.getContent()).hasSize(1);
         assertThat(page.getContent().get(0).contactName()).isEqualTo("Zhang San");
-        verify(reminderRepository).search(eq(1L), eq("pending"), isNull(), eq("zhang"), isNull(), any(), any());
+        verify(reminderRepository).search(eq(1L), eq("pending"), isNull(), eq("zhang"), isNull(), any(), any(), any(), any());
     }
 
     @Test
     void completeUpdatesCompletionTimestamp() {
-        ContactReminder reminder = reminder(9L, 1L, 3L, ReminderType.OTHER, LocalDate.now(), false);
+        ContactReminder reminder = reminder(9L, 1L, 3L, ReminderType.OTHER, LocalDateTime.now(), false);
         when(reminderRepository.findByIdAndUserId(9L, 1L)).thenReturn(Optional.of(reminder));
         when(contactRepository.findAllById(List.of(3L))).thenReturn(List.of(contact(3L, 1L, "Li Si", "13900139000", false)));
 
@@ -73,11 +73,11 @@ class ReminderServiceTest {
 
     @Test
     void dashboardSummaryCountsOnlyActiveContacts() {
-        LocalDate today = LocalDate.now();
-        ContactReminder overdue = reminder(1L, 1L, 3L, ReminderType.FOLLOW_UP, today.minusDays(1), false);
-        ContactReminder todayReminder = reminder(2L, 1L, 4L, ReminderType.OTHER, today, false);
-        ContactReminder deletedContactReminder = reminder(3L, 1L, 5L, ReminderType.BIRTHDAY, today.plusDays(1), false);
-        when(reminderRepository.findByUserIdAndCompletedFalseAndRemindDateLessThanEqualOrderByRemindDateAscUpdatedAtDesc(1L, today.plusDays(7)))
+        LocalDateTime now = LocalDateTime.now();
+        ContactReminder overdue = reminder(1L, 1L, 3L, ReminderType.FOLLOW_UP, now.minusMinutes(1), false);
+        ContactReminder todayReminder = reminder(2L, 1L, 4L, ReminderType.OTHER, now.plusMinutes(30), false);
+        ContactReminder deletedContactReminder = reminder(3L, 1L, 5L, ReminderType.BIRTHDAY, now.plusDays(1), false);
+        when(reminderRepository.findByUserIdAndCompletedFalseAndRemindAtLessThanEqualOrderByRemindAtAscUpdatedAtDesc(eq(1L), any()))
                 .thenReturn(List.of(overdue, todayReminder, deletedContactReminder));
         when(contactRepository.findAllById(List.of(3L, 4L, 5L)))
                 .thenReturn(List.of(
@@ -103,13 +103,13 @@ class ReminderServiceTest {
         return contact;
     }
 
-    private ContactReminder reminder(Long id, Long userId, Long contactId, ReminderType type, LocalDate date, boolean completed) {
+    private ContactReminder reminder(Long id, Long userId, Long contactId, ReminderType type, LocalDateTime remindAt, boolean completed) {
         ContactReminder reminder = new ContactReminder();
         ReflectionTestUtils.setField(reminder, "id", id);
         reminder.setUserId(userId);
         reminder.setContactId(contactId);
         reminder.setType(type);
-        reminder.setRemindDate(date);
+        reminder.setRemindAt(remindAt);
         reminder.setNote("note");
         reminder.setCompleted(completed);
         return reminder;

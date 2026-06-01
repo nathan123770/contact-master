@@ -118,7 +118,7 @@ const DetailItem = defineComponent({
 .detail-avatar {
   width: 94px;
   height: 94px;
-  border-radius: 32px;
+  border-radius: 50%;
   font-size: 34px;
 }
 

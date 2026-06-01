@@ -29,7 +29,7 @@
           <article v-for="reminder in reminderItems" :key="reminder.id" class="reminder-line">
             <div>
               <strong>{{ reminder.contactName || '未知联系人' }}</strong>
-              <span>{{ typeLabel(reminder.type) }} · {{ reminder.remindDate }}</span>
+              <span>{{ typeLabel(reminder.type) }} · {{ remindTime(reminder.remindAt) }}</span>
             </div>
             <el-tag :type="reminder.overdue ? 'danger' : 'primary'" size="small">
               {{ reminder.overdue ? '逾期' : '待办' }}
@@ -118,6 +118,17 @@ function typeLabel(type) {
     OTHER: '其他'
   }
   return labels[type] || '其他'
+}
+
+function remindTime(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
 }
 </script>
 

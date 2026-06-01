@@ -1,14 +1,5 @@
 <template>
   <div class="reminder-page">
-    <header class="reminder-hero glass-panel">
-      <div>
-        <p>Reminder Center</p>
-        <h2>提醒</h2>
-        <span>{{ page.total }} 条提醒 · {{ pendingCountText }}</span>
-      </div>
-      <el-button type="primary" :icon="Plus" @click="openCreate">新建提醒</el-button>
-    </header>
-
     <section class="reminder-tools glass-panel">
       <el-input
         v-model="query.keyword"
@@ -28,13 +19,13 @@
         <el-option v-for="item in reminderTypes" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
       <el-button :icon="Refresh" @click="reloadFirstPage">刷新</el-button>
+      <el-button type="primary" :icon="Plus" @click="openCreate">新建提醒</el-button>
     </section>
 
     <section class="reminder-list glass-panel">
       <article v-for="reminder in reminders" :key="reminder.id" :class="['reminder-row', { overdue: reminder.overdue }]">
-        <div class="reminder-date">
-          <strong>{{ dayText(reminder.remindDate) }}</strong>
-          <span>{{ reminder.remindDate }}</span>
+        <div :class="['reminder-kind', tagClass(reminder.type)]">
+          <el-icon><component :is="typeIcon(reminder.type)" /></el-icon>
         </div>
         <div class="reminder-main">
           <div class="reminder-title">
@@ -45,6 +36,10 @@
           </div>
           <p>{{ reminder.contactPhone || '未填写手机号' }}</p>
           <small>{{ reminder.note || '暂无备注' }}</small>
+        </div>
+        <div class="reminder-time">
+          <strong>{{ dayText(reminder.remindAt) }}</strong>
+          <span>{{ timeText(reminder.remindAt) }}</span>
         </div>
         <div class="reminder-actions">
           <el-button link type="primary" :icon="Edit" @click="openEdit(reminder)">编辑</el-button>
@@ -90,8 +85,14 @@
             <el-option v-for="item in reminderTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="提醒日期" prop="remindDate">
-          <el-date-picker v-model="form.remindDate" value-format="YYYY-MM-DD" type="date" style="width: 100%" />
+        <el-form-item label="提醒时间" prop="remindAt">
+          <el-date-picker
+            v-model="form.remindAt"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            format="YYYY-MM-DD HH:mm"
+            type="datetime"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.note" type="textarea" :rows="3" maxlength="500" show-word-limit />
@@ -106,9 +107,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Bell, Calendar, Check, Delete, Edit, Flag, PhoneFilled, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { api, unwrap } from '../api'
 
 const reminderTypes = [
@@ -125,14 +126,12 @@ const query = reactive({ keyword: '', status: 'pending', type: '' })
 const formVisible = ref(false)
 const editing = ref(null)
 const formRef = ref()
-const form = reactive({ contactId: null, type: 'FOLLOW_UP', remindDate: '', note: '' })
+const form = reactive({ contactId: null, type: 'FOLLOW_UP', remindAt: '', note: '' })
 const rules = {
   contactId: [{ required: true, message: '请选择联系人', trigger: 'change' }],
   type: [{ required: true, message: '请选择提醒类型', trigger: 'change' }],
-  remindDate: [{ required: true, message: '请选择提醒日期', trigger: 'change' }]
+  remindAt: [{ required: true, message: '请选择提醒时间', trigger: 'change' }]
 }
-
-const pendingCountText = computed(() => (query.status === 'pending' ? '默认显示未完成' : '当前筛选结果'))
 
 onMounted(async () => {
   await Promise.all([loadContacts(), load()])
@@ -169,7 +168,7 @@ async function loadContacts() {
 
 function openCreate() {
   editing.value = null
-  Object.assign(form, { contactId: null, type: 'FOLLOW_UP', remindDate: '', note: '' })
+  Object.assign(form, { contactId: null, type: 'FOLLOW_UP', remindAt: '', note: '' })
   formVisible.value = true
 }
 
@@ -178,7 +177,7 @@ function openEdit(reminder) {
   Object.assign(form, {
     contactId: reminder.contactId,
     type: reminder.type,
-    remindDate: reminder.remindDate,
+    remindAt: reminder.remindAt || (reminder.remindDate ? `${reminder.remindDate}T09:00:00` : ''),
     note: reminder.note || ''
   })
   formVisible.value = true
@@ -186,10 +185,17 @@ function openEdit(reminder) {
 
 async function submit() {
   await formRef.value.validate()
+  const payload = {
+    contactId: form.contactId,
+    type: form.type,
+    remindDate: form.remindAt?.slice(0, 10),
+    remindAt: normalizeRemindAt(form.remindAt),
+    note: form.note
+  }
   if (editing.value) {
-    await api.put(`/reminders/${editing.value.id}`, form)
+    await api.put(`/reminders/${editing.value.id}`, payload)
   } else {
-    await api.post('/reminders', form)
+    await api.post('/reminders', payload)
   }
   ElMessage.success('提醒已保存')
   formVisible.value = false
@@ -220,14 +226,52 @@ function tagType(type) {
   return 'info'
 }
 
+function typeIcon(type) {
+  if (type === 'BIRTHDAY') return Calendar
+  if (type === 'FOLLOW_UP') return PhoneFilled
+  if (type === 'ANNIVERSARY') return Flag
+  return Bell
+}
+
+function tagClass(type) {
+  return `type-${String(type || 'OTHER').toLowerCase()}`
+}
+
+function normalizeRemindAt(value) {
+  if (!value) return value
+  return value.length === 16 ? `${value}:00` : value
+}
+
+function reminderDateValue(value) {
+  if (!value) return null
+  const normalized = value.includes('T') ? value : `${value}T09:00:00`
+  const date = new Date(normalized)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 function dayText(dateText) {
+  const date = reminderDateValue(dateText)
+  if (!date) return '未定时间'
   const today = new Date()
-  const date = new Date(`${dateText}T00:00:00`)
-  const diff = Math.round((date - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000)
+  const dateDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const diff = Math.round((dateDay - todayDay) / 86400000)
   if (diff < 0) return `逾期 ${Math.abs(diff)} 天`
   if (diff === 0) return '今天'
   if (diff === 1) return '明天'
   return `${diff} 天后`
+}
+
+function timeText(dateText) {
+  const date = reminderDateValue(dateText)
+  if (!date) return ''
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
 }
 </script>
 
@@ -237,37 +281,11 @@ function dayText(dateText) {
   gap: 14px;
 }
 
-.reminder-hero,
 .reminder-tools,
 .reminder-list {
   padding: 18px;
 }
 
-.reminder-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.reminder-hero p,
-.reminder-hero h2,
-.reminder-hero span {
-  margin: 0;
-}
-
-.reminder-hero p {
-  color: var(--ios-blue);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.reminder-hero h2 {
-  color: var(--ios-text);
-  font-size: 28px;
-}
-
-.reminder-hero span,
 .reminder-main p,
 .reminder-main small,
 .reminder-date span,
@@ -277,7 +295,7 @@ function dayText(dateText) {
 
 .reminder-tools {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 150px 150px auto;
+  grid-template-columns: minmax(220px, 1fr) 150px 150px auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -289,20 +307,25 @@ function dayText(dateText) {
 
 .reminder-list {
   display: grid;
-  min-height: 480px;
+  min-height: 420px;
+  align-content: start;
   gap: 10px;
 }
 
 .reminder-row {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: 50px minmax(0, 1fr) 128px auto;
+  gap: 12px;
   align-items: center;
   border: 1px solid rgb(255 255 255 / 64%);
-  border-radius: 22px;
-  padding: 14px;
-  background: rgb(255 255 255 / 66%);
-  box-shadow: 0 10px 26px rgb(45 91 160 / 7%);
+  border-radius: 24px;
+  padding: 12px 14px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 78%), rgb(255 255 255 / 46%)),
+    rgb(255 255 255 / 62%);
+  box-shadow:
+    0 12px 30px rgb(45 91 160 / 8%),
+    inset 0 1px 0 rgb(255 255 255 / 86%);
 }
 
 .reminder-row.overdue {
@@ -310,10 +333,56 @@ function dayText(dateText) {
   background: rgb(255 245 244 / 76%);
 }
 
-.reminder-date strong {
+.reminder-kind {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 74%);
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(145deg, #0a84ff, #5e5ce6);
+  box-shadow:
+    0 14px 28px rgb(0 122 255 / 18%),
+    inset 0 1px 0 rgb(255 255 255 / 42%);
+}
+
+.reminder-kind.type_birthday,
+.reminder-kind.type-birthday {
+  background: linear-gradient(145deg, #ff9f0a, #ff6b35);
+}
+
+.reminder-kind.type_anniversary,
+.reminder-kind.type-anniversary {
+  background: linear-gradient(145deg, #34c759, #00a878);
+}
+
+.reminder-kind.type_other,
+.reminder-kind.type-other {
+  background: linear-gradient(145deg, #8e8e93, #5e5ce6);
+}
+
+.reminder-time {
+  justify-self: end;
+  min-width: 108px;
+  border-radius: 18px;
+  padding: 9px 12px;
+  color: var(--ios-text);
+  text-align: right;
+  background: rgb(255 255 255 / 62%);
+}
+
+.reminder-time strong {
   display: block;
   color: var(--ios-text);
-  font-size: 18px;
+  font-size: 15px;
+}
+
+.reminder-time span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ios-text-muted);
+  font-size: 12px;
 }
 
 .reminder-title {
@@ -338,6 +407,7 @@ function dayText(dateText) {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 2px;
 }
 
 .reminder-empty {
@@ -367,6 +437,11 @@ function dayText(dateText) {
   .reminder-tools,
   .reminder-row {
     grid-template-columns: 1fr;
+  }
+
+  .reminder-time {
+    justify-self: stretch;
+    text-align: left;
   }
 
   .reminder-actions {

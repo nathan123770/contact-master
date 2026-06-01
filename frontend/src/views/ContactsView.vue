@@ -1,21 +1,6 @@
-<template>
+﻿<template>
   <div class="ios-contact-shell">
-    <header class="ios-contact-hero glass-panel">
-      <div class="ios-contact-title">
-        <div class="ios-profile-avatar ios-avatar">{{ userInitial }}</div>
-        <div>
-          <p>联系人中心</p>
-          <h2>通讯录</h2>
-          <span>{{ allContacts.length }} 位联系人 · {{ groups.length }} 个分组</span>
-        </div>
-      </div>
-      <div class="ios-contact-primary-actions">
-        <el-button :icon="Refresh" circle aria-label="刷新联系人" @click="loadAll" />
-        <el-button type="primary" :icon="Plus" circle aria-label="新增联系人" @click="openCreate" />
-      </div>
-    </header>
-
-    <section class="ios-contact-tools glass-panel">
+    <section :class="['ios-contact-tools glass-panel', { searchOnly: activeTab === 'favorites' }]">
       <el-input
         v-model="query.keyword"
         class="ios-search"
@@ -23,7 +8,9 @@
         clearable
         :prefix-icon="Search"
       />
-      <div class="ios-tool-buttons">
+      <div v-if="activeTab !== 'favorites'" class="ios-tool-buttons">
+        <el-button :icon="Refresh" @click="loadAll">刷新</el-button>
+        <el-button type="primary" :icon="Plus" @click="openCreate">新增联系人</el-button>
         <el-button :icon="Plus" @click="openGroupCreate">新建分组</el-button>
         <el-upload :show-file-list="false" accept=".csv" :http-request="importCsv">
           <el-button :icon="Upload">导入 CSV</el-button>
@@ -36,7 +23,7 @@
       </div>
     </section>
 
-    <nav class="ios-contact-tabs glass-panel" aria-label="通讯录分类">
+    <nav v-if="activeTab !== 'favorites'" class="ios-contact-tabs glass-panel" aria-label="通讯录分类">
       <button
         v-for="tab in tabs"
         :key="tab.key"
@@ -50,8 +37,35 @@
     </nav>
 
     <main class="ios-contact-body glass-panel">
+      <nav
+        v-if="activeTab !== 'groups' && activeLetters.size"
+        ref="alphabetRailRef"
+        class="ios-alpha-rail"
+        aria-label="联系人字母索引"
+        @pointerdown.prevent="startAlphabetDrag"
+        @pointermove.prevent="moveAlphabetDrag"
+        @pointerup="stopAlphabetDrag"
+        @pointercancel="stopAlphabetDrag"
+      >
+        <button
+          v-for="letter in alphabetLetters"
+          :key="letter"
+          :data-letter="letter"
+          :class="['ios-alpha-letter', { active: activeLetter === letter, available: activeLetters.has(letter) }]"
+          type="button"
+          :disabled="!activeLetters.has(letter)"
+          @click.stop="jumpToLetter(letter)"
+        >
+          {{ letter }}
+        </button>
+      </nav>
+
       <template v-if="activeTab === 'groups'">
-        <section v-for="section in groupSections" :key="section.id" class="ios-group-section">
+        <section
+          v-for="section in groupSections"
+          :key="section.id"
+          class="ios-group-section"
+        >
           <button class="ios-group-row" type="button" @click="toggleGroup(section.id)" @contextmenu.prevent="openGroupMenu($event, section.group)">
             <span :class="['ios-disclosure', { open: isExpanded(section.id) }]"></span>
             <span class="ios-group-name">{{ section.name }}</span>
@@ -123,29 +137,6 @@
             />
           </section>
         </div>
-
-        <nav
-          v-if="alphabetSections.length"
-          ref="alphabetRailRef"
-          class="ios-alpha-rail"
-          aria-label="联系人字母索引"
-          @pointerdown.prevent="startAlphabetDrag"
-          @pointermove.prevent="moveAlphabetDrag"
-          @pointerup="stopAlphabetDrag"
-          @pointercancel="stopAlphabetDrag"
-        >
-          <button
-            v-for="letter in alphabetLetters"
-            :key="letter"
-            :data-letter="letter"
-            :class="['ios-alpha-letter', { active: activeLetter === letter, available: availableLetters.has(letter) }]"
-            type="button"
-            :disabled="!availableLetters.has(letter)"
-            @click.stop="jumpToLetter(letter)"
-          >
-            {{ letter }}
-          </button>
-        </nav>
         <div v-if="!currentTabContacts.length" class="ios-empty-state">
           <strong>{{ emptyTitle }}</strong>
           <p>换个关键词试试，或添加一位新联系人。</p>
@@ -198,6 +189,9 @@ import { api, unwrap } from '../api'
 import ContactForm from '../components/ContactForm.vue'
 import ContactDetail from '../components/ContactDetail.vue'
 
+const props = defineProps({
+  initialTab: { type: String, default: 'groups' }
+})
 defineEmits(['openReminders'])
 
 const UNGROUPED_KEY = 'ungrouped'
@@ -295,7 +289,7 @@ const importResult = ref({ successCount: 0, failureCount: 0, failures: [] })
 const editing = ref(null)
 const initialGroupId = ref(null)
 const detail = ref(null)
-const activeTab = ref('groups')
+const activeTab = ref(props.initialTab)
 const expandedGroupIds = ref(new Set([UNGROUPED_KEY]))
 const query = ref({ keyword: '' })
 const alphabetRailRef = ref()
@@ -305,11 +299,6 @@ const highlightedLetter = ref('')
 const isAlphabetDragging = ref(false)
 let highlightTimer = null
 
-const userInitial = computed(() => {
-  const user = JSON.parse(localStorage.getItem('user') || 'null')
-  return user?.username?.slice(0, 1)?.toUpperCase() || 'CM'
-})
-
 const normalizedKeyword = computed(() => query.value.keyword.trim().toLowerCase())
 const filteredContacts = computed(() => allContacts.value.filter(matchesKeyword))
 const favoriteContacts = computed(() => allContacts.value.filter((contact) => contact.favorite))
@@ -318,7 +307,6 @@ const rawUngroupedContacts = computed(() => allContacts.value.filter((contact) =
 const tabs = computed(() => [
   { key: 'groups', label: '分组', count: groups.value.length },
   { key: 'friends', label: '全部', count: allContacts.value.length },
-  { key: 'favorites', label: '收藏', count: favoriteContacts.value.length },
   { key: 'ungrouped', label: '未分组', count: rawUngroupedContacts.value.length }
 ])
 
@@ -365,6 +353,7 @@ const alphabetSections = computed(() => {
 })
 
 const availableLetters = computed(() => new Set(alphabetSections.value.map((section) => section.letter)))
+const activeLetters = computed(() => availableLetters.value)
 
 const emptyTitle = computed(() => {
   if (activeTab.value === 'favorites') return '还没有收藏联系人'
@@ -622,7 +611,7 @@ async function importCsv({ file }) {
 function downloadTemplate() {
   const header = 'name,phone,email,group,company,position,address,birthday,remark,favorite\n'
   const sample = '张三,13800138000,zhangsan@example.com,默认分组,示例公司,工程师,上海市,2000-06-03,重要客户,Y\n'
-  downloadBlob(new Blob([header + sample], { type: 'text/csv;charset=utf-8' }), 'contacts-template.csv')
+  downloadBlob(new Blob(['\ufeff', header + sample], { type: 'text/csv;charset=utf-8' }), 'contacts-template.csv')
 }
 
 async function exportCsv() {
@@ -649,64 +638,10 @@ function downloadBlob(blob, fileName) {
   gap: 14px;
 }
 
-.ios-contact-hero,
 .ios-contact-tools,
 .ios-contact-tabs,
 .ios-contact-body {
   position: relative;
-}
-
-.ios-contact-hero {
-  display: flex;
-  min-height: 96px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 22px;
-}
-
-.ios-contact-title {
-  display: flex;
-  min-width: 0;
-  gap: 14px;
-  align-items: center;
-}
-
-.ios-profile-avatar {
-  width: 58px;
-  height: 58px;
-  border-radius: 21px;
-  font-size: 19px;
-}
-
-.ios-contact-title p,
-.ios-contact-title h2,
-.ios-contact-title span {
-  margin: 0;
-}
-
-.ios-contact-title p {
-  color: var(--ios-blue);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.ios-contact-title h2 {
-  color: var(--ios-text);
-  font-size: 28px;
-  line-height: 1.1;
-}
-
-.ios-contact-title span {
-  display: block;
-  margin-top: 5px;
-  color: var(--ios-text-muted);
-  font-size: 13px;
-}
-
-.ios-contact-primary-actions {
-  display: flex;
-  gap: 10px;
 }
 
 .ios-contact-tools {
@@ -720,6 +655,10 @@ function downloadBlob(blob, fileName) {
   background:
     linear-gradient(118deg, rgb(255 255 255 / 48%), rgb(255 255 255 / 18%) 56%, rgb(255 255 255 / 36%)),
     rgb(255 255 255 / 30%);
+}
+
+.ios-contact-tools.searchOnly {
+  grid-template-columns: minmax(240px, 1fr);
 }
 
 .ios-search :deep(.el-input__wrapper) {
@@ -807,6 +746,7 @@ function downloadBlob(blob, fileName) {
 
 .ios-contact-body {
   min-height: 520px;
+  overflow: hidden;
   padding: 10px;
 }
 
@@ -896,10 +836,6 @@ function downloadBlob(blob, fileName) {
 
 .ios-alpha-list-wrap {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
-  gap: 8px;
-  align-items: start;
   min-height: 280px;
 }
 
@@ -943,24 +879,27 @@ function downloadBlob(blob, fileName) {
 
 .ios-alpha-rail {
   position: sticky;
-  top: calc(50dvh - 230px);
-  z-index: 8;
-  grid-column: 2;
-  grid-row: 1;
-  align-self: start;
-  justify-self: center;
-  display: grid;
-  gap: 1px;
-  width: 24px;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+  margin: 0 0 10px;
   border: 1px solid rgb(255 255 255 / 76%);
-  border-radius: 999px;
-  padding: 7px 3px;
+  border-radius: 18px;
+  padding: 6px 8px;
   background: rgb(255 255 255 / 72%);
   box-shadow: 0 16px 34px rgb(45 91 160 / 14%), inset 0 1px 0 rgb(255 255 255 / 90%);
   backdrop-filter: var(--ios-blur);
   -webkit-backdrop-filter: var(--ios-blur);
   user-select: none;
   touch-action: none;
+  scrollbar-width: none;
+}
+
+.ios-alpha-rail::-webkit-scrollbar {
+  display: none;
 }
 
 .ios-alpha-letter {
@@ -1001,7 +940,7 @@ function downloadBlob(blob, fileName) {
   grid-template-columns: 28px 46px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  margin: 0 8px 8px;
+  margin: 0 0 8px 8px;
   border: 1px solid rgb(255 255 255 / 64%);
   border-radius: 22px;
   padding: 10px 12px;
@@ -1151,20 +1090,6 @@ function downloadBlob(blob, fileName) {
 }
 
 @media (max-width: 760px) {
-  .ios-contact-hero {
-    min-height: 82px;
-    padding: 16px;
-  }
-
-  .ios-profile-avatar {
-    width: 50px;
-    height: 50px;
-  }
-
-  .ios-contact-title h2 {
-    font-size: 24px;
-  }
-
   .ios-contact-tabs {
     overflow-x: auto;
     grid-template-columns: repeat(4, minmax(104px, 1fr));
@@ -1196,12 +1121,10 @@ function downloadBlob(blob, fileName) {
   }
 
   .ios-alpha-list-wrap {
-    grid-template-columns: minmax(0, 1fr) 24px;
-    gap: 4px;
+    min-height: 280px;
   }
 
   .ios-alpha-rail {
-    width: 22px;
     padding-inline: 2px;
   }
 
@@ -1212,3 +1135,4 @@ function downloadBlob(blob, fileName) {
   }
 }
 </style>
+
