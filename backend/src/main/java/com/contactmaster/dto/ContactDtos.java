@@ -20,6 +20,7 @@ public class ContactDtos {
             String address,
             LocalDate birthday,
             String remark,
+            String avatarData,
             boolean favorite
     ) {
     }
@@ -36,6 +37,7 @@ public class ContactDtos {
             String address,
             LocalDate birthday,
             String remark,
+            String avatarData,
             boolean favorite,
             boolean deleted,
             LocalDateTime deletedAt,
@@ -55,6 +57,7 @@ public class ContactDtos {
                     contact.getAddress(),
                     contact.getBirthday(),
                     contact.getRemark(),
+                    contact.getAvatarData(),
                     contact.isFavorite(),
                     contact.isDeleted(),
                     contact.getDeletedAt(),

@@ -199,6 +199,7 @@ public class ContactService {
         contact.setAddress(normalize(request.address()));
         contact.setBirthday(request.birthday());
         contact.setRemark(normalize(request.remark()));
+        contact.setAvatarData(normalize(request.avatarData()));
         contact.setFavorite(request.favorite());
     }
 
@@ -230,6 +231,7 @@ public class ContactService {
                 cell(cells, 6),
                 birthday,
                 cell(cells, 8),
+                null,
                 "Y".equalsIgnoreCase(cell(cells, 9)) || "true".equalsIgnoreCase(cell(cells, 9))
         );
     }

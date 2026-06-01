@@ -1,9 +1,12 @@
 <template>
   <div class="line">
-    <div class="avatar">{{ contact.name?.slice(0, 1) }}</div>
-    <div>
+    <div class="contact-line-avatar">
+      <img v-if="contact.avatarData" :src="contact.avatarData" alt="联系人头像" />
+      <span v-else>{{ contact.name?.slice(0, 1) }}</span>
+    </div>
+    <div class="line-copy">
       <strong>{{ contact.name }}</strong>
-      <p>{{ birthday ? contact.birthday : contact.phone }}</p>
+      <p>{{ birthday ? contact.birthday || '未填写生日' : contact.phone || '未填写手机号' }}</p>
     </div>
     <el-tag v-if="contact.groupName" size="small">{{ contact.groupName }}</el-tag>
   </div>
@@ -19,33 +22,41 @@ defineProps({
 <style scoped>
 .line {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+  min-height: 64px;
+  border: 1px solid rgb(255 255 255 / 64%);
+  border-radius: 20px;
   padding: 10px;
-  border: 1px solid #eef1f6;
-  border-radius: 8px;
+  background: rgb(255 255 255 / 56%);
 }
 
-.avatar {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 8px;
-  color: #1d4ed8;
-  font-weight: 800;
-  background: #eaf2ff;
+.contact-line-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 16px;
 }
 
-.line div:nth-child(2) {
+.line-copy {
   min-width: 0;
   flex: 1;
 }
 
+.line-copy strong,
+.line-copy p {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-copy strong {
+  color: var(--ios-text);
+}
+
 p {
   margin: 4px 0 0;
-  color: #6b7280;
+  color: var(--ios-text-muted);
   font-size: 13px;
 }
 </style>

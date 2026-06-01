@@ -1,9 +1,10 @@
 <template>
-  <div>
+  <div class="dashboard-page">
     <div class="stats-grid">
-      <div v-for="item in statsCards" :key="item.label" class="stat-card">
+      <div v-for="item in statsCards" :key="item.label" class="stat-card glass-panel">
         <span>{{ item.label }}</span>
         <strong>{{ item.value }}</strong>
+        <p>{{ item.hint }}</p>
       </div>
     </div>
 
@@ -57,11 +58,11 @@ const birthdays = ref([])
 const favorites = ref([])
 
 const statsCards = computed(() => [
-  { label: '联系人总数', value: stats.value.totalContacts },
-  { label: '收藏联系人', value: stats.value.favoriteContacts },
-  { label: '分组数量', value: stats.value.groupCount },
-  { label: '回收站', value: stats.value.recycleBinCount },
-  { label: '生日提醒', value: stats.value.birthdayCount }
+  { label: '联系人总数', value: stats.value.totalContacts, hint: '全部可用联系人' },
+  { label: '收藏联系人', value: stats.value.favoriteContacts, hint: '重点关系' },
+  { label: '分组数量', value: stats.value.groupCount, hint: '通讯录结构' },
+  { label: '回收站', value: stats.value.recycleBinCount, hint: '可恢复联系人' },
+  { label: '生日提醒', value: stats.value.birthdayCount, hint: '近 7 天' }
 ])
 
 onMounted(load)
@@ -81,30 +82,39 @@ async function load() {
 </script>
 
 <style scoped>
+.dashboard-page {
+  display: grid;
+  gap: 18px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 14px;
-  margin-bottom: 18px;
 }
 
 .stat-card {
   padding: 18px;
-  border: 1px solid #e6eaf2;
-  border-radius: 8px;
-  background: #fff;
 }
 
 .stat-card span {
-  color: #6b7280;
-  font-size: 14px;
+  color: var(--ios-text-muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .stat-card strong {
   display: block;
   margin-top: 10px;
-  color: #1d4ed8;
-  font-size: 28px;
+  color: var(--ios-blue);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.stat-card p {
+  margin: 10px 0 0;
+  color: var(--ios-text-subtle);
+  font-size: 12px;
 }
 
 .dashboard-grid {
@@ -122,9 +132,24 @@ async function load() {
   gap: 10px;
 }
 
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 980px) {
-  .stats-grid,
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid .panel:first-child {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .stats-grid {
     grid-template-columns: 1fr;
   }
 }

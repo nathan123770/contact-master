@@ -1,10 +1,11 @@
 <template>
   <main class="auth-page">
-    <section class="auth-card">
+    <section class="auth-card glass-panel">
       <div class="auth-heading">
         <div class="brand-mark">CM</div>
+        <p>Contact Master</p>
         <h1>电话通讯录管理系统</h1>
-        <p>登录后管理联系人、分组、导入导出和回收站</p>
+        <span>登录后管理联系人、分组、导入导出和回收站。</span>
       </div>
 
       <el-tabs v-model="mode" stretch>
@@ -14,13 +15,13 @@
 
       <el-form :model="form" label-position="top" @keyup.enter="submit">
         <el-form-item label="用户名">
-          <el-input v-model="form.username" size="large" placeholder="请输入用户名" />
+          <el-input v-model="form.username" size="large" placeholder="请输入用户名" autocomplete="username" />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="form.password" size="large" type="password" show-password placeholder="请输入密码" />
+          <el-input v-model="form.password" size="large" type="password" show-password placeholder="请输入密码" autocomplete="current-password" />
         </el-form-item>
         <el-form-item v-if="mode === 'register'" label="邮箱">
-          <el-input v-model="form.email" size="large" placeholder="用于找回和展示，可选" />
+          <el-input v-model="form.email" size="large" placeholder="用于找回和展示，可选" inputmode="email" />
         </el-form-item>
         <el-button type="primary" size="large" class="submit" :loading="loading" @click="submit">
           {{ mode === 'login' ? '登录系统' : '注册并登录' }}
@@ -62,50 +63,59 @@ async function submit() {
 <style scoped>
 .auth-page {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   place-items: center;
   padding: 24px;
-  background: linear-gradient(135deg, #eef6ff, #f7f9fc 45%, #eef2ff);
 }
 
 .auth-card {
-  width: min(440px, 100%);
-  padding: 28px;
-  border: 1px solid #e5eaf4;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 16px 40px rgb(15 23 42 / 10%);
+  width: min(460px, 100%);
+  padding: 30px;
 }
 
 .auth-heading {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   text-align: center;
 }
 
 .brand-mark {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: 58px;
+  height: 58px;
   margin: 0 auto 14px;
   place-items: center;
-  border-radius: 8px;
+  border: 1px solid rgb(255 255 255 / 78%);
+  border-radius: 22px;
   color: #fff;
+  font-weight: 850;
+  background: linear-gradient(135deg, #007aff, #7c3aed);
+  box-shadow: 0 16px 34px rgb(0 122 255 / 22%);
+}
+
+.auth-heading p {
+  margin: 0 0 5px;
+  color: var(--ios-blue);
+  font-size: 12px;
   font-weight: 800;
-  background: #2563eb;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 h1 {
   margin: 0;
-  font-size: 24px;
+  color: var(--ios-text);
+  font-size: 26px;
 }
 
-p {
-  margin: 8px 0 0;
-  color: #6b7280;
+.auth-heading span {
+  display: block;
+  margin-top: 8px;
+  color: var(--ios-text-muted);
 }
 
 .submit {
   width: 100%;
+  min-height: 46px;
   margin-top: 8px;
 }
 </style>

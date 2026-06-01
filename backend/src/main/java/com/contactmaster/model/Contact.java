@@ -40,6 +40,10 @@ public class Contact {
     @Column(length = 500)
     private String remark;
 
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String avatarData;
+
     @Column(nullable = false)
     private boolean favorite;
 
@@ -141,6 +145,14 @@ public class Contact {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public String getAvatarData() {
+        return avatarData;
+    }
+
+    public void setAvatarData(String avatarData) {
+        this.avatarData = avatarData;
     }
 
     public boolean isFavorite() {

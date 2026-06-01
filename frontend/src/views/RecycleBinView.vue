@@ -1,8 +1,10 @@
 <template>
-  <div>
+  <div class="recycle-page">
     <div class="toolbar">
-      <h2 class="page-title">回收站</h2>
-      <span class="muted">这里展示软删除的联系人，可恢复或彻底删除。</span>
+      <div>
+        <h2 class="page-title">回收站</h2>
+        <span class="muted">这里展示软删除的联系人，可恢复或彻底删除。</span>
+      </div>
     </div>
 
     <section class="panel">
@@ -11,7 +13,7 @@
         <el-table-column prop="phone" label="手机号" min-width="130" />
         <el-table-column prop="groupName" label="分组" width="120" />
         <el-table-column prop="deletedAt" label="删除时间" min-width="180" />
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="190">
           <template #default="{ row }">
             <el-button text type="primary" @click="restore(row)">恢复</el-button>
             <el-button text type="danger" @click="permanentDelete(row)">彻底删除</el-button>
@@ -28,10 +30,17 @@
             <el-button size="small" type="danger" plain @click="permanentDelete(row)">彻底删除</el-button>
           </div>
         </el-card>
+        <el-empty v-if="!contacts.length" description="回收站为空" />
       </div>
 
       <div class="pagination">
-        <el-pagination layout="prev, pager, next, total" :total="total" :page-size="query.size" v-model:current-page="query.page" @current-change="load" />
+        <el-pagination
+          layout="prev, pager, next, total"
+          :total="total"
+          :page-size="query.size"
+          v-model:current-page="query.page"
+          @current-change="load"
+        />
       </div>
     </section>
   </div>
@@ -61,7 +70,7 @@ async function restore(row) {
 }
 
 async function permanentDelete(row) {
-  await ElMessageBox.confirm(`彻底删除后无法恢复，确认删除「${row.name}」？`, '彻底删除确认', { type: 'warning' })
+  await ElMessageBox.confirm(`彻底删除后无法恢复，确认删除“${row.name}”？`, '彻底删除确认', { type: 'warning' })
   await api.delete(`/contacts/${row.id}/permanent`)
   ElMessage.success('已彻底删除')
   await load()
@@ -69,15 +78,14 @@ async function permanentDelete(row) {
 </script>
 
 <style scoped>
-.pagination {
-  display: flex;
-  justify-content: flex-end;
-  padding: 14px 16px;
+.recycle-page {
+  display: grid;
+  gap: 14px;
 }
 
 .mobile-card-list p {
   margin: 8px 0 0;
-  color: #6b7280;
+  color: var(--ios-text-muted);
 }
 
 .mobile-actions {
