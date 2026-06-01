@@ -122,7 +122,7 @@ const pageInfo = {
   },
   contacts: {
     title: '通讯录',
-    eyebrow: 'iOS 26 Contacts',
+    eyebrow: 'Contacts',
     description: '按分组和未分组快速浏览，支持导入导出与批量管理。'
   },
   favorites: {
