@@ -12,19 +12,21 @@
   --ios-text: #101828;
   --ios-text-muted: #667085;
   --ios-text-subtle: #8a96a8;
-  --ios-line: rgb(255 255 255 / 70%);
-  --ios-line-strong: rgb(177 199 231 / 42%);
-  --ios-glass: rgb(255 255 255 / 68%);
-  --ios-glass-soft: rgb(255 255 255 / 48%);
-  --ios-glass-solid: rgb(255 255 255 / 86%);
+  --ios-line: rgb(255 255 255 / 58%);
+  --ios-line-strong: rgb(177 199 231 / 38%);
+  --ios-glass: rgb(255 255 255 / 42%);
+  --ios-glass-soft: rgb(255 255 255 / 28%);
+  --ios-glass-solid: rgb(255 255 255 / 78%);
+  --ios-glass-edge: rgb(255 255 255 / 72%);
+  --ios-glass-highlight: rgb(255 255 255 / 46%);
   --ios-bg: #eef5ff;
   --ios-radius-xl: 32px;
   --ios-radius-lg: 24px;
   --ios-radius-md: 18px;
   --ios-radius-sm: 14px;
-  --ios-shadow: 0 24px 70px rgb(45 91 160 / 16%);
-  --ios-shadow-soft: 0 14px 38px rgb(45 91 160 / 11%);
-  --ios-blur: blur(24px) saturate(180%);
+  --ios-shadow: 0 26px 80px rgb(45 91 160 / 18%);
+  --ios-shadow-soft: 0 16px 46px rgb(45 91 160 / 13%);
+  --ios-blur: blur(34px) saturate(210%) contrast(1.04);
   --ios-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -88,12 +90,50 @@ button:focus-visible,
 
 .glass-panel,
 .panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border: 1px solid var(--ios-line);
   border-radius: var(--ios-radius-lg);
-  background: var(--ios-glass);
-  box-shadow: var(--ios-shadow-soft), inset 0 1px 0 rgb(255 255 255 / 84%);
+  background:
+    radial-gradient(circle at 14% 0%, rgb(255 255 255 / 54%), transparent 34%),
+    linear-gradient(135deg, rgb(255 255 255 / 46%), rgb(255 255 255 / 16%) 52%, rgb(255 255 255 / 34%)),
+    var(--ios-glass);
+  box-shadow:
+    var(--ios-shadow-soft),
+    inset 0 1px 0 var(--ios-glass-edge),
+    inset 0 -1px 0 rgb(255 255 255 / 22%);
   backdrop-filter: var(--ios-blur);
   -webkit-backdrop-filter: var(--ios-blur);
+}
+
+.glass-panel::before,
+.panel::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(118deg, rgb(255 255 255 / 38%), transparent 31%, rgb(255 255 255 / 13%) 58%, transparent 78%),
+    radial-gradient(circle at 90% 12%, rgb(255 255 255 / 34%), transparent 30%);
+  content: "";
+}
+
+.glass-panel::after,
+.panel::after {
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+}
+
+.glass-panel > *,
+.panel > * {
+  position: relative;
+  z-index: 1;
 }
 
 .page-title {

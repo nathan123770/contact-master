@@ -2,6 +2,7 @@ package com.contactmaster.service;
 
 import com.contactmaster.dto.ContactDtos.ContactResponse;
 import com.contactmaster.dto.DashboardDtos.Statistics;
+import com.contactmaster.dto.ReminderDtos.DashboardReminders;
 import com.contactmaster.model.Contact;
 import com.contactmaster.repository.ContactGroupRepository;
 import com.contactmaster.repository.ContactRepository;
@@ -17,10 +18,12 @@ import java.util.stream.Collectors;
 public class DashboardService {
     private final ContactRepository contactRepository;
     private final ContactGroupRepository groupRepository;
+    private final ReminderService reminderService;
 
-    public DashboardService(ContactRepository contactRepository, ContactGroupRepository groupRepository) {
+    public DashboardService(ContactRepository contactRepository, ContactGroupRepository groupRepository, ReminderService reminderService) {
         this.contactRepository = contactRepository;
         this.groupRepository = groupRepository;
+        this.reminderService = reminderService;
     }
 
     public Statistics statistics(Long userId) {
@@ -44,6 +47,10 @@ public class DashboardService {
 
     public List<ContactResponse> birthdays(Long userId) {
         return map(userId, birthdayContacts(userId));
+    }
+
+    public DashboardReminders reminders(Long userId) {
+        return new DashboardReminders(reminderService.dashboardSummary(userId), reminderService.dashboard(userId));
     }
 
     private List<Contact> birthdayContacts(Long userId) {

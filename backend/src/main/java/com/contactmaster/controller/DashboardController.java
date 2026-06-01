@@ -3,6 +3,7 @@ package com.contactmaster.controller;
 import com.contactmaster.common.ApiResponse;
 import com.contactmaster.dto.ContactDtos.ContactResponse;
 import com.contactmaster.dto.DashboardDtos.Statistics;
+import com.contactmaster.dto.ReminderDtos.DashboardReminders;
 import com.contactmaster.service.DashboardService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -36,5 +37,10 @@ public class DashboardController extends BaseController {
     @GetMapping("/birthdays")
     public ApiResponse<List<ContactResponse>> birthdays(HttpServletRequest request) {
         return ApiResponse.ok(dashboardService.birthdays(currentUserId(request)));
+    }
+
+    @GetMapping("/reminders")
+    public ApiResponse<DashboardReminders> reminders(HttpServletRequest request) {
+        return ApiResponse.ok(dashboardService.reminders(currentUserId(request)));
     }
 }

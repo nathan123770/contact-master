@@ -24,6 +24,20 @@
         <DetailItem label="地址" :value="contact.address || '未填写'" />
       </section>
 
+      <section class="detail-card reminders-card">
+        <div class="detail-card-header">
+          <strong>未完成提醒</strong>
+          <el-button text type="primary" @click="$emit('open-reminders')">查看全部</el-button>
+        </div>
+        <div v-if="reminders.length" class="detail-reminders">
+          <article v-for="reminder in reminders" :key="reminder.id">
+            <span>{{ typeLabel(reminder.type) }} · {{ reminder.remindDate }}</span>
+            <strong>{{ reminder.note || '暂无备注' }}</strong>
+          </article>
+        </div>
+        <el-empty v-else description="暂无未完成提醒" :image-size="72" />
+      </section>
+
       <section class="detail-card">
         <DetailItem label="备注" :value="contact.remark || '无'" />
       </section>
@@ -32,13 +46,37 @@
 </template>
 
 <script setup>
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref, watch } from 'vue'
+import { api, unwrap } from '../api'
 
-defineProps({
+const props = defineProps({
   modelValue: Boolean,
   contact: Object
 })
-defineEmits(['update:modelValue'])
+defineEmits(['update:modelValue', 'open-reminders'])
+
+const reminders = ref([])
+
+watch(
+  () => [props.modelValue, props.contact?.id],
+  async ([visible, contactId]) => {
+    reminders.value = []
+    if (!visible || !contactId) return
+    const data = unwrap(await api.get('/reminders', { params: { contactId, status: 'pending', page: 1, size: 5 } }))
+    reminders.value = data.items
+  },
+  { immediate: true }
+)
+
+function typeLabel(type) {
+  const labels = {
+    BIRTHDAY: '生日',
+    FOLLOW_UP: '回访',
+    ANNIVERSARY: '纪念日',
+    OTHER: '其他'
+  }
+  return labels[type] || '其他'
+}
 
 const DetailItem = defineComponent({
   name: 'DetailItem',
@@ -112,15 +150,47 @@ p {
   border-top: 1px solid rgb(177 199 231 / 30%);
 }
 
-.detail-item span {
+.detail-item span,
+.detail-reminders span {
   color: var(--ios-text-muted);
   font-size: 13px;
 }
 
-.detail-item strong {
+.detail-item strong,
+.detail-card-header strong,
+.detail-reminders strong {
   min-width: 0;
   color: var(--ios-text);
   font-weight: 680;
   overflow-wrap: anywhere;
+}
+
+.detail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.detail-reminders {
+  display: grid;
+  gap: 8px;
+  padding: 0 0 12px;
+}
+
+.detail-reminders article {
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgb(255 255 255 / 62%);
+}
+
+.detail-reminders span,
+.detail-reminders strong {
+  display: block;
+}
+
+.detail-reminders strong {
+  margin-top: 4px;
 }
 </style>

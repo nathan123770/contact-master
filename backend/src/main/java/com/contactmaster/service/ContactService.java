@@ -30,13 +30,16 @@ public class ContactService {
     private final ContactRepository contactRepository;
     private final ContactGroupRepository groupRepository;
     private final ImportRecordRepository importRecordRepository;
+    private final ReminderService reminderService;
 
     public ContactService(ContactRepository contactRepository,
                           ContactGroupRepository groupRepository,
-                          ImportRecordRepository importRecordRepository) {
+                          ImportRecordRepository importRecordRepository,
+                          ReminderService reminderService) {
         this.contactRepository = contactRepository;
         this.groupRepository = groupRepository;
         this.importRecordRepository = importRecordRepository;
+        this.reminderService = reminderService;
     }
 
     public Page<ContactResponse> search(Long userId, String keyword, Long groupId, Boolean favorite, int page, int size) {
@@ -121,6 +124,7 @@ public class ContactService {
         if (!contact.isDeleted()) {
             throw new BusinessException("请先删除到回收站，再执行彻底删除");
         }
+        reminderService.deleteByContact(userId, id);
         contactRepository.delete(contact);
     }
 

@@ -22,6 +22,25 @@
 
       <section class="panel">
         <div class="panel-header">
+          <strong>提醒</strong>
+          <el-button text type="primary" @click="$emit('openReminders')">管理提醒</el-button>
+        </div>
+        <div class="panel-body list">
+          <article v-for="reminder in reminderItems" :key="reminder.id" class="reminder-line">
+            <div>
+              <strong>{{ reminder.contactName || '未知联系人' }}</strong>
+              <span>{{ typeLabel(reminder.type) }} · {{ reminder.remindDate }}</span>
+            </div>
+            <el-tag :type="reminder.overdue ? 'danger' : 'primary'" size="small">
+              {{ reminder.overdue ? '逾期' : '待办' }}
+            </el-tag>
+          </article>
+          <el-empty v-if="!reminderItems.length" description="暂无待处理提醒" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
           <strong>近 7 天生日</strong>
           <el-tag type="warning">{{ birthdays.length }} 人</el-tag>
         </div>
@@ -50,9 +69,11 @@ import { computed, onMounted, ref } from 'vue'
 import { api, unwrap } from '../api'
 import ContactLine from '../components/ContactLine.vue'
 
-defineEmits(['openContacts'])
+defineEmits(['openContacts', 'openReminders'])
 
 const stats = ref({ totalContacts: 0, favoriteContacts: 0, groupCount: 0, recycleBinCount: 0, birthdayCount: 0 })
+const reminderSummary = ref({ overdueCount: 0, todayCount: 0, upcomingCount: 0 })
+const reminderItems = ref([])
 const recent = ref([])
 const birthdays = ref([])
 const favorites = ref([])
@@ -62,22 +83,41 @@ const statsCards = computed(() => [
   { label: '收藏联系人', value: stats.value.favoriteContacts, hint: '重点关系' },
   { label: '分组数量', value: stats.value.groupCount, hint: '通讯录结构' },
   { label: '回收站', value: stats.value.recycleBinCount, hint: '可恢复联系人' },
-  { label: '生日提醒', value: stats.value.birthdayCount, hint: '近 7 天' }
+  { label: '生日提醒', value: stats.value.birthdayCount, hint: '近 7 天' },
+  {
+    label: '待处理提醒',
+    value: reminderSummary.value.overdueCount + reminderSummary.value.todayCount + reminderSummary.value.upcomingCount,
+    hint: `${reminderSummary.value.overdueCount} 条逾期 · ${reminderSummary.value.todayCount} 条今日`
+  }
 ])
 
 onMounted(load)
 
 async function load() {
-  const [s, r, b, f] = await Promise.all([
+  const [s, r, b, f, reminders] = await Promise.all([
     api.get('/dashboard/statistics'),
     api.get('/dashboard/recent'),
     api.get('/dashboard/birthdays'),
-    api.get('/dashboard/favorites')
+    api.get('/dashboard/favorites'),
+    api.get('/dashboard/reminders')
   ])
   stats.value = unwrap(s)
   recent.value = unwrap(r)
   birthdays.value = unwrap(b)
   favorites.value = unwrap(f)
+  const reminderData = unwrap(reminders)
+  reminderSummary.value = reminderData.summary
+  reminderItems.value = reminderData.items
+}
+
+function typeLabel(type) {
+  const labels = {
+    BIRTHDAY: '生日',
+    FOLLOW_UP: '回访',
+    ANNIVERSARY: '纪念日',
+    OTHER: '其他'
+  }
+  return labels[type] || '其他'
 }
 </script>
 
@@ -89,7 +129,7 @@ async function load() {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  grid-template-columns: repeat(6, minmax(130px, 1fr));
   gap: 14px;
 }
 
@@ -130,6 +170,31 @@ async function load() {
 .list {
   display: grid;
   gap: 10px;
+}
+
+.reminder-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgb(255 255 255 / 62%);
+}
+
+.reminder-line strong,
+.reminder-line span {
+  display: block;
+}
+
+.reminder-line strong {
+  color: var(--ios-text);
+}
+
+.reminder-line span {
+  margin-top: 3px;
+  color: var(--ios-text-muted);
+  font-size: 12px;
 }
 
 @media (max-width: 1100px) {

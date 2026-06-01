@@ -46,8 +46,9 @@
       </header>
 
       <main class="content">
-        <DashboardView v-if="active === 'dashboard'" @openContacts="active = 'contacts'" />
-        <ContactsView v-else-if="active === 'contacts'" />
+        <DashboardView v-if="active === 'dashboard'" @openContacts="active = 'contacts'" @openReminders="active = 'reminders'" />
+        <ContactsView v-else-if="active === 'contacts'" @openReminders="active = 'reminders'" />
+        <RemindersView v-else-if="active === 'reminders'" />
         <RecycleBinView v-else />
       </main>
     </section>
@@ -84,12 +85,13 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { ArrowDown, DataLine, Delete, UserFilled } from '@element-plus/icons-vue'
+import { ArrowDown, Bell, DataLine, Delete, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from './api'
 import AuthView from './views/AuthView.vue'
 import DashboardView from './views/DashboardView.vue'
 import ContactsView from './views/ContactsView.vue'
+import RemindersView from './views/RemindersView.vue'
 import RecycleBinView from './views/RecycleBinView.vue'
 
 const token = ref(localStorage.getItem('token'))
@@ -101,6 +103,7 @@ const passwordForm = ref({ oldPassword: '', newPassword: '' })
 const navItems = [
   { key: 'dashboard', label: '概览', icon: DataLine },
   { key: 'contacts', label: '通讯录', icon: UserFilled },
+  { key: 'reminders', label: '提醒', icon: Bell },
   { key: 'recycle', label: '回收站', icon: Delete }
 ]
 
@@ -114,6 +117,11 @@ const pageInfo = {
     title: '通讯录',
     eyebrow: 'iOS 26 Contacts',
     description: '按分组、收藏和未分组快速浏览，支持导入导出与批量管理。'
+  },
+  reminders: {
+    title: '提醒中心',
+    eyebrow: 'Contact Reminders',
+    description: '集中管理回访、生日、纪念日和其他联系人提醒。'
   },
   recycle: {
     title: '回收站',
@@ -157,7 +165,17 @@ async function changePassword() {
   position: sticky;
   top: 18px;
   height: calc(100dvh - 36px);
+  border-color: rgb(255 255 255 / 60%);
+  border-radius: 30px;
   padding: 18px;
+  background:
+    radial-gradient(circle at 18% 8%, rgb(255 255 255 / 62%), transparent 34%),
+    linear-gradient(155deg, rgb(255 255 255 / 52%), rgb(235 248 255 / 24%) 48%, rgb(255 255 255 / 36%)),
+    rgb(255 255 255 / 32%);
+  box-shadow:
+    0 28px 70px rgb(45 91 160 / 16%),
+    inset 0 1px 0 rgb(255 255 255 / 78%),
+    inset 0 -1px 0 rgb(255 255 255 / 20%);
 }
 
 .brand {
@@ -173,11 +191,15 @@ async function changePassword() {
   height: 48px;
   place-items: center;
   border: 1px solid rgb(255 255 255 / 78%);
-  border-radius: 18px;
+  border-radius: 17px;
   color: #fff;
   font-weight: 850;
-  background: linear-gradient(135deg, #007aff, #7c3aed);
-  box-shadow: 0 16px 34px rgb(0 122 255 / 22%);
+  background:
+    radial-gradient(circle at 28% 18%, rgb(255 255 255 / 52%), transparent 24%),
+    linear-gradient(145deg, #0a84ff, #5e5ce6 62%, #7c3aed);
+  box-shadow:
+    0 18px 36px rgb(0 122 255 / 24%),
+    inset 0 1px 0 rgb(255 255 255 / 46%);
 }
 
 .brand strong,
@@ -198,7 +220,7 @@ async function changePassword() {
 
 .app-nav {
   display: grid;
-  gap: 8px;
+  gap: 9px;
 }
 
 .app-nav-item,
@@ -214,17 +236,52 @@ async function changePassword() {
 .app-nav-item {
   min-height: 48px;
   gap: 12px;
-  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 999px;
   padding: 0 14px;
   font-size: 15px;
   font-weight: 700;
 }
 
+.app-nav-item::before,
+.mobile-nav-item::before {
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, rgb(255 255 255 / 42%), transparent 42%, rgb(255 255 255 / 22%)),
+    rgb(255 255 255 / 26%);
+  opacity: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.app-nav-item > *,
+.mobile-nav-item > * {
+  position: relative;
+  z-index: 1;
+}
+
 .app-nav-item:hover,
 .app-nav-item.active {
   color: var(--ios-text);
-  background: rgb(255 255 255 / 72%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 86%), 0 10px 24px rgb(45 91 160 / 10%);
+  border-color: rgb(255 255 255 / 58%);
+  background: rgb(255 255 255 / 34%);
+  box-shadow:
+    0 14px 32px rgb(45 91 160 / 13%),
+    inset 0 1px 0 rgb(255 255 255 / 82%),
+    inset 0 -1px 0 rgb(255 255 255 / 20%);
+  backdrop-filter: blur(18px) saturate(190%);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  transform: translateY(-1px);
+}
+
+.app-nav-item:hover::before,
+.app-nav-item.active::before,
+.mobile-nav-item.active::before {
+  opacity: 1;
 }
 
 .app-workspace {
@@ -237,7 +294,13 @@ async function changePassword() {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+  border-color: rgb(255 255 255 / 58%);
+  border-radius: 30px;
   padding: 18px 22px;
+  background:
+    radial-gradient(circle at 10% 0%, rgb(255 255 255 / 60%), transparent 30%),
+    linear-gradient(112deg, rgb(255 255 255 / 46%), rgb(242 249 255 / 20%) 48%, rgb(255 255 255 / 36%)),
+    rgb(255 255 255 / 30%);
 }
 
 .eyebrow {
@@ -266,8 +329,15 @@ async function changePassword() {
 
 .account-button {
   min-height: 42px;
-  border-color: rgb(255 255 255 / 72%);
-  background: rgb(255 255 255 / 68%);
+  border-color: rgb(255 255 255 / 64%);
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 66%), rgb(255 255 255 / 30%)),
+    rgb(255 255 255 / 34%);
+  box-shadow:
+    0 12px 28px rgb(45 91 160 / 10%),
+    inset 0 1px 0 rgb(255 255 255 / 82%);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
 }
 
 .content {
@@ -313,10 +383,17 @@ async function changePassword() {
     left: 12px;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     padding: 8px;
-    border-radius: 24px;
+    border-color: rgb(255 255 255 / 58%);
+    border-radius: 28px;
+    background:
+      linear-gradient(135deg, rgb(255 255 255 / 56%), rgb(255 255 255 / 22%)),
+      rgb(255 255 255 / 30%);
+    box-shadow:
+      0 24px 64px rgb(45 91 160 / 24%),
+      inset 0 1px 0 rgb(255 255 255 / 78%);
   }
 
   .mobile-nav-item {
@@ -324,15 +401,21 @@ async function changePassword() {
     flex-direction: column;
     justify-content: center;
     gap: 3px;
-    border-radius: 18px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: 20px;
     font-size: 12px;
     font-weight: 700;
   }
 
   .mobile-nav-item.active {
     color: var(--ios-text);
-    background: rgb(255 255 255 / 74%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 90%);
+    border-color: rgb(255 255 255 / 58%);
+    background: rgb(255 255 255 / 32%);
+    box-shadow:
+      0 10px 24px rgb(45 91 160 / 12%),
+      inset 0 1px 0 rgb(255 255 255 / 86%);
   }
 }
 

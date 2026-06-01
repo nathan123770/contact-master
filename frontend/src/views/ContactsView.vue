@@ -101,18 +101,51 @@
         </section>
       </template>
 
-      <section v-else class="ios-flat-list">
-        <ContactRow
-          v-for="contact in currentTabContacts"
-          :key="contact.id"
-          :contact="contact"
-          :selected="isSelected(contact.id)"
-          @toggle-selected="toggleSelected(contact.id, $event)"
-          @detail="showDetail(contact)"
-          @edit="openEdit(contact)"
-          @favorite="toggleFavorite(contact)"
-          @remove="remove(contact)"
-        />
+      <section v-else class="ios-alpha-list-wrap">
+        <div class="ios-flat-list">
+          <section
+            v-for="section in alphabetSections"
+            :key="section.letter"
+            :ref="(el) => setLetterSectionRef(section.letter, el)"
+            :class="['ios-letter-section', { highlighted: highlightedLetter === section.letter }]"
+          >
+            <div class="ios-letter-heading">{{ section.letter }}</div>
+            <ContactRow
+              v-for="contact in section.contacts"
+              :key="contact.id"
+              :contact="contact"
+              :selected="isSelected(contact.id)"
+              @toggle-selected="toggleSelected(contact.id, $event)"
+              @detail="showDetail(contact)"
+              @edit="openEdit(contact)"
+              @favorite="toggleFavorite(contact)"
+              @remove="remove(contact)"
+            />
+          </section>
+        </div>
+
+        <nav
+          v-if="alphabetSections.length"
+          ref="alphabetRailRef"
+          class="ios-alpha-rail"
+          aria-label="联系人字母索引"
+          @pointerdown.prevent="startAlphabetDrag"
+          @pointermove.prevent="moveAlphabetDrag"
+          @pointerup="stopAlphabetDrag"
+          @pointercancel="stopAlphabetDrag"
+        >
+          <button
+            v-for="letter in alphabetLetters"
+            :key="letter"
+            :data-letter="letter"
+            :class="['ios-alpha-letter', { active: activeLetter === letter, available: availableLetters.has(letter) }]"
+            type="button"
+            :disabled="!availableLetters.has(letter)"
+            @click.stop="jumpToLetter(letter)"
+          >
+            {{ letter }}
+          </button>
+        </nav>
         <div v-if="!currentTabContacts.length" class="ios-empty-state">
           <strong>{{ emptyTitle }}</strong>
           <p>换个关键词试试，或添加一位新联系人。</p>
@@ -122,7 +155,7 @@
     </main>
 
     <ContactForm v-model="formVisible" :contact="editing" :initial-group-id="initialGroupId" :groups="groups" @saved="afterSaved" />
-    <ContactDetail v-model="detailVisible" :contact="detail" />
+    <ContactDetail v-model="detailVisible" :contact="detail" @open-reminders="$emit('openReminders')" />
 
     <el-dialog v-model="groupVisible" :title="groupEditing ? '重命名分组' : '新增分组'" width="420px">
       <el-form label-position="top">
@@ -165,7 +198,19 @@ import { api, unwrap } from '../api'
 import ContactForm from '../components/ContactForm.vue'
 import ContactDetail from '../components/ContactDetail.vue'
 
+defineEmits(['openReminders'])
+
 const UNGROUPED_KEY = 'ungrouped'
+const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+const chineseInitials = {
+  艾: 'A', 安: 'A', 白: 'B', 包: 'B', 曹: 'C', 陈: 'C', 程: 'C', 崔: 'C', 邓: 'D', 丁: 'D',
+  董: 'D', 杜: 'D', 范: 'F', 方: 'F', 冯: 'F', 傅: 'F', 高: 'G', 郭: 'G', 韩: 'H', 何: 'H',
+  胡: 'H', 黄: 'H', 蒋: 'J', 金: 'J', 孔: 'K', 李: 'L', 廖: 'L', 林: 'L', 刘: 'L', 龙: 'L',
+  卢: 'L', 罗: 'L', 马: 'M', 毛: 'M', 潘: 'P', 彭: 'P', 钱: 'Q', 秦: 'Q', 邱: 'Q', 任: 'R',
+  沈: 'S', 石: 'S', 宋: 'S', 苏: 'S', 孙: 'S', 谭: 'T', 唐: 'T', 田: 'T', 汪: 'W', 王: 'W',
+  吴: 'W', 夏: 'X', 肖: 'X', 谢: 'X', 徐: 'X', 许: 'X', 薛: 'X', 杨: 'Y', 姚: 'Y', 叶: 'Y',
+  于: 'Y', 余: 'Y', 袁: 'Y', 曾: 'Z', 张: 'Z', 赵: 'Z', 郑: 'Z', 周: 'Z', 朱: 'Z'
+}
 
 const ContactRow = defineComponent({
   name: 'ContactRow',
@@ -253,6 +298,12 @@ const detail = ref(null)
 const activeTab = ref('groups')
 const expandedGroupIds = ref(new Set([UNGROUPED_KEY]))
 const query = ref({ keyword: '' })
+const alphabetRailRef = ref()
+const letterSectionRefs = ref({})
+const activeLetter = ref('')
+const highlightedLetter = ref('')
+const isAlphabetDragging = ref(false)
+let highlightTimer = null
 
 const userInitial = computed(() => {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
@@ -295,6 +346,26 @@ const currentTabContacts = computed(() => {
   return filteredContacts.value
 })
 
+const sortedCurrentTabContacts = computed(() =>
+  [...currentTabContacts.value].sort((a, b) => {
+    const letterCompare = contactLetter(a).localeCompare(contactLetter(b), 'en', { sensitivity: 'base' })
+    if (letterCompare !== 0) return letterCompare
+    return contactDisplayKey(a).localeCompare(contactDisplayKey(b), 'zh-Hans-CN', { sensitivity: 'base' })
+  })
+)
+
+const alphabetSections = computed(() => {
+  const sections = new Map()
+  for (const contact of sortedCurrentTabContacts.value) {
+    const letter = contactLetter(contact)
+    if (!sections.has(letter)) sections.set(letter, [])
+    sections.get(letter).push(contact)
+  }
+  return Array.from(sections, ([letter, contacts]) => ({ letter, contacts }))
+})
+
+const availableLetters = computed(() => new Set(alphabetSections.value.map((section) => section.letter)))
+
 const emptyTitle = computed(() => {
   if (activeTab.value === 'favorites') return '还没有收藏联系人'
   if (activeTab.value === 'ungrouped') return '没有未分组联系人'
@@ -316,6 +387,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeGroupMenu)
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('pointerup', stopAlphabetDrag)
+  window.removeEventListener('pointercancel', stopAlphabetDrag)
+  if (highlightTimer) window.clearTimeout(highlightTimer)
 })
 
 async function loadAll() {
@@ -341,6 +415,64 @@ function matchesKeyword(contact) {
     .join(' ')
     .toLowerCase()
   return target.includes(normalizedKeyword.value)
+}
+
+function contactDisplayKey(contact) {
+  return (contact.name || contact.phone || '').trim()
+}
+
+function contactLetter(contact) {
+  const first = contactDisplayKey(contact).slice(0, 1)
+  const mapped = chineseInitials[first]
+  if (mapped) return mapped
+  const upper = first.toUpperCase()
+  return /^[A-Z]$/.test(upper) ? upper : '#'
+}
+
+function setLetterSectionRef(letter, el) {
+  if (el) {
+    letterSectionRefs.value[letter] = el
+  } else {
+    delete letterSectionRefs.value[letter]
+  }
+}
+
+function startAlphabetDrag(event) {
+  isAlphabetDragging.value = true
+  window.addEventListener('pointerup', stopAlphabetDrag, { once: true })
+  window.addEventListener('pointercancel', stopAlphabetDrag, { once: true })
+  handleAlphabetPointer(event)
+}
+
+function moveAlphabetDrag(event) {
+  if (!isAlphabetDragging.value) return
+  handleAlphabetPointer(event)
+}
+
+function stopAlphabetDrag() {
+  isAlphabetDragging.value = false
+}
+
+function handleAlphabetPointer(event) {
+  const rail = alphabetRailRef.value
+  if (!rail) return
+  const rect = rail.getBoundingClientRect()
+  const clampedY = Math.min(Math.max(event.clientY - rect.top, 0), rect.height - 1)
+  const index = Math.floor((clampedY / rect.height) * alphabetLetters.length)
+  jumpToLetter(alphabetLetters[index])
+}
+
+function jumpToLetter(letter) {
+  if (!availableLetters.value.has(letter)) return
+  const target = letterSectionRefs.value[letter]
+  if (!target) return
+  activeLetter.value = letter
+  highlightedLetter.value = letter
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (highlightTimer) window.clearTimeout(highlightTimer)
+  highlightTimer = window.setTimeout(() => {
+    highlightedLetter.value = ''
+  }, 900)
 }
 
 function isExpanded(groupId) {
@@ -582,7 +714,12 @@ function downloadBlob(blob, fileName) {
   grid-template-columns: minmax(240px, 420px) minmax(0, 1fr);
   gap: 12px;
   align-items: center;
+  border-color: rgb(255 255 255 / 58%);
+  border-radius: 28px;
   padding: 14px;
+  background:
+    linear-gradient(118deg, rgb(255 255 255 / 48%), rgb(255 255 255 / 18%) 56%, rgb(255 255 255 / 36%)),
+    rgb(255 255 255 / 30%);
 }
 
 .ios-search :deep(.el-input__wrapper) {
@@ -601,14 +738,21 @@ function downloadBlob(blob, fileName) {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+  border-color: rgb(255 255 255 / 58%);
+  border-radius: 28px;
   padding: 8px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 48%), rgb(255 255 255 / 18%)),
+    rgb(255 255 255 / 28%);
 }
 
 .ios-tab {
   display: grid;
   min-height: 56px;
-  border: 0;
-  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 22px;
   padding: 8px 10px;
   color: var(--ios-text-muted);
   text-align: left;
@@ -616,8 +760,22 @@ function downloadBlob(blob, fileName) {
   cursor: pointer;
 }
 
+.ios-tab::before {
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, rgb(255 255 255 / 48%), transparent 45%, rgb(255 255 255 / 18%)),
+    rgb(255 255 255 / 30%);
+  opacity: 0;
+  pointer-events: none;
+  content: "";
+}
+
 .ios-tab strong,
 .ios-tab span {
+  position: relative;
+  z-index: 1;
   display: block;
 }
 
@@ -632,8 +790,19 @@ function downloadBlob(blob, fileName) {
 
 .ios-tab.active {
   color: var(--ios-text);
-  background: rgb(255 255 255 / 76%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 92%), 0 10px 24px rgb(45 91 160 / 10%);
+  border-color: rgb(255 255 255 / 58%);
+  background: rgb(255 255 255 / 32%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 88%),
+    inset 0 -1px 0 rgb(255 255 255 / 18%),
+    0 14px 32px rgb(45 91 160 / 13%);
+  backdrop-filter: blur(18px) saturate(190%);
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  transform: translateY(-1px);
+}
+
+.ios-tab.active::before {
+  opacity: 1;
 }
 
 .ios-contact-body {
@@ -723,6 +892,104 @@ function downloadBlob(blob, fileName) {
   gap: 8px;
 }
 
+.ios-alpha-list-wrap {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 8px;
+  min-height: 280px;
+}
+
+.ios-letter-section {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  scroll-margin-top: 12px;
+}
+
+.ios-letter-section + .ios-letter-section {
+  margin-top: 12px;
+}
+
+.ios-letter-section.highlighted {
+  animation: letter-section-pulse 0.9s var(--ios-ease);
+}
+
+.ios-letter-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: inline-flex;
+  width: fit-content;
+  min-width: 38px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 999px;
+  color: var(--ios-blue);
+  font-size: 13px;
+  font-weight: 850;
+  background: rgb(255 255 255 / 78%);
+  box-shadow: 0 10px 24px rgb(45 91 160 / 10%), inset 0 1px 0 rgb(255 255 255 / 86%);
+  backdrop-filter: var(--ios-blur);
+  -webkit-backdrop-filter: var(--ios-blur);
+}
+
+.ios-alpha-rail {
+  position: sticky;
+  top: calc(50dvh - 230px);
+  z-index: 8;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: center;
+  display: grid;
+  gap: 1px;
+  width: 24px;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 999px;
+  padding: 7px 3px;
+  background: rgb(255 255 255 / 72%);
+  box-shadow: 0 16px 34px rgb(45 91 160 / 14%), inset 0 1px 0 rgb(255 255 255 / 90%);
+  backdrop-filter: var(--ios-blur);
+  -webkit-backdrop-filter: var(--ios-blur);
+  user-select: none;
+  touch-action: none;
+}
+
+.ios-alpha-letter {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--ios-text-subtle);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ios-alpha-letter.available {
+  color: var(--ios-blue);
+}
+
+.ios-alpha-letter.active {
+  color: #fff;
+  background: var(--ios-blue);
+  box-shadow: 0 8px 18px rgb(0 122 255 / 24%);
+  transform: scale(1.24);
+}
+
+.ios-alpha-letter:disabled {
+  cursor: default;
+  opacity: 0.34;
+}
+
 .ios-contact-row {
   display: grid;
   min-height: 70px;
@@ -736,6 +1003,20 @@ function downloadBlob(blob, fileName) {
   background: rgb(255 255 255 / 66%);
   box-shadow: 0 10px 26px rgb(45 91 160 / 7%);
   cursor: pointer;
+}
+
+@keyframes letter-section-pulse {
+  0% {
+    filter: none;
+  }
+
+  28% {
+    filter: drop-shadow(0 0 18px rgb(0 122 255 / 28%));
+  }
+
+  100% {
+    filter: none;
+  }
 }
 
 .ios-flat-list .ios-contact-row {
@@ -907,6 +1188,22 @@ function downloadBlob(blob, fileName) {
   .ios-row-actions {
     grid-column: 3;
     justify-content: flex-start;
+  }
+
+  .ios-alpha-list-wrap {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 4px;
+  }
+
+  .ios-alpha-rail {
+    width: 22px;
+    padding-inline: 2px;
+  }
+
+  .ios-alpha-letter {
+    width: 16px;
+    height: 15px;
+    font-size: 9px;
   }
 }
 </style>
