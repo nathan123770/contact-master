@@ -889,6 +889,8 @@ function downloadBlob(blob, fileName) {
 .ios-contact-list,
 .ios-flat-list {
   display: grid;
+  align-content: start;
+  align-items: start;
   gap: 8px;
 }
 
@@ -897,12 +899,15 @@ function downloadBlob(blob, fileName) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 30px;
   gap: 8px;
+  align-items: start;
   min-height: 280px;
 }
 
 .ios-letter-section {
   position: relative;
   display: grid;
+  align-content: start;
+  align-items: start;
   gap: 8px;
   scroll-margin-top: 12px;
 }
