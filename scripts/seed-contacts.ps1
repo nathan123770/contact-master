@@ -1,5 +1,5 @@
 param(
-  [int]$UserId = 2
+  [int]$UserId = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,27 +41,63 @@ $people = @(
   @{ Name="Derek Du"; Company="Redwood Medical"; Position="Medical Assistant"; Address="68 Beijing Rd, Guiyang"; Birthday="1990-11-28"; GroupId=6; Favorite=1 }
 )
 
-$imageUrls = @()
-foreach ($i in 0..14) {
-  $imageUrls += "https://randomuser.me/api/portraits/men/$i.jpg"
-  $imageUrls += "https://randomuser.me/api/portraits/women/$i.jpg"
-}
+$remarks = @(
+  "Key account, monthly follow-up",
+  "Design partner contact",
+  "Consulting project contact",
+  "Course communication contact",
+  "Logistics coordination contact",
+  "Investment business contact",
+  "Content partnership contact",
+  "Technical integration contact",
+  "Marketing campaign contact",
+  "Store operations contact",
+  "Sales priority contact",
+  "Brand partnership contact",
+  "Data analysis contact",
+  "Project delivery contact",
+  "Charity event contact",
+  "Product experience contact",
+  "Travel business contact",
+  "Procurement coordination contact",
+  "Photography partner contact",
+  "Frontend technical contact",
+  "Legal support contact",
+  "Regional business contact",
+  "QA coordination contact",
+  "Music course contact",
+  "Hotel business contact",
+  "Insurance claim contact",
+  "Quality management contact",
+  "Energy business contact",
+  "Publishing editor contact",
+  "Medical coordination contact"
+)
 
 $values = New-Object System.Collections.Generic.List[string]
 for ($i = 0; $i -lt $people.Count; $i++) {
   $number = $i + 1
   $avatarPath = Join-Path $avatarDir ("avatar-{0:D2}.jpg" -f $number)
-  Invoke-WebRequest -Uri $imageUrls[$i] -OutFile $avatarPath
+  if (-not (Test-Path $avatarPath)) {
+    throw "Missing seed avatar: $avatarPath"
+  }
 
   $bytes = [System.IO.File]::ReadAllBytes($avatarPath)
   if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xFF -or $bytes[1] -ne 0xD8) {
-    throw "Downloaded avatar is not a JPG: $avatarPath"
+    throw "Seed avatar is not a JPG: $avatarPath"
   }
-  $avatarData = "data:image/jpeg;base64," + [Convert]::ToBase64String($bytes)
+  $avatarData = "/avatars/seed-contacts/avatar-{0:D2}.jpg" -f $number
   $person = $people[$i]
   $phone = "1392606{0:D4}" -f $number
   $email = "seed{0:D2}@contact-master.local" -f $number
-  $remark = "Demo contact, avatar file: /avatars/seed-contacts/avatar-{0:D2}.jpg" -f $number
+  $remark = $remarks[$i]
+  $groupName = switch ($person.GroupId) {
+    6 { "家人" }
+    7 { "朋友" }
+    8 { "同事" }
+    default { "默认分组" }
+  }
+  $groupExpression = "(SELECT id FROM contact_groups WHERE user_id = $UserId AND name = '$groupName' LIMIT 1)"
 
   foreach ($key in @("Name","Company","Position","Address","Birthday")) {
     $person[$key] = $person[$key].Replace("'", "''")
@@ -71,7 +107,7 @@ for ($i = 0; $i -lt $people.Count; $i++) {
 
   $values.Add(("({0},{1},'{2}','{3}','{4}','{5}','{6}','{7}','{8}','{9}','{10}',{11},0,NOW(6),NOW(6))" -f
     $UserId,
-    $person.GroupId,
+    $groupExpression,
     $person.Name,
     $phone,
     $email,
@@ -102,7 +138,12 @@ WHERE user_id = $UserId
   AND phone IN ($deletePhones);
 "@
 
-$sqlPath = Join-Path $root "scripts\seed-contacts.generated.sql"
-[System.IO.File]::WriteAllText($sqlPath, $sql, [System.Text.Encoding]::UTF8)
-
-mysql -uroot -proot contact_master --default-character-set=utf8mb4 -e "source $($sqlPath.Replace('\','/'))"
+$sqlPath = Join-Path ([System.IO.Path]::GetTempPath()) ("seed-contacts-{0}.sql" -f [System.Guid]::NewGuid())
+try {
+  [System.IO.File]::WriteAllText($sqlPath, $sql, [System.Text.Encoding]::UTF8)
+  mysql -uroot -proot contact_master --default-character-set=utf8mb4 -e "source $($sqlPath.Replace('\','/'))"
+} finally {
+  if (Test-Path $sqlPath) {
+    Remove-Item -LiteralPath $sqlPath -Force
+  }
+}
